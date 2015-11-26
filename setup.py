@@ -28,7 +28,7 @@ from setuptools import setup
 
 setup(
     name='picasa-export',
-    version='0.1',
+    version='1.0',
     description='exports your media from google-photos/picasa',
     author='Ali Vakilzade',
     author_email='ali@vakilzade.ir',
