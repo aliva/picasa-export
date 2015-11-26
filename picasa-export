@@ -207,18 +207,10 @@ class PicasaExport:
     def get_api(self, url):
         r = self.session.get(url, stream=True, timeout=100)
 
-        size = int(r.headers.get("Content-Length", 0))
-
-        if size:
-            bar = progressbar.ProgressBar(max_value=size)
-        else:
-            bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
         out = bytes()
         for chunk in r.iter_content(chunk_size=1024):
             if chunk:
                 out += chunk
-
-            # bar.update(len(out))
         return out
 
     def get_image(self, url, album_title, file_name):
