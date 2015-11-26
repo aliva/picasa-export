@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+
+import colorama
+import progressbar
+import os.path
+from colorama import Fore
+from json import dump, load
+from requests_oauthlib import OAuth2Session
+from webbrowser import open_new_tab
+from xml.etree import ElementTree
+
+
+class PicasaExport:
+    client_id = "724353149631-gjh5pfmonqrajf6s69rj61i899t2dqde.apps.googleusercontent.com"
+    client_secret = "Wru1lU5ZAs8CHRajR6Gd1_DH"
+    scope = [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://picasaweb.google.com/data/",
+    ]
+    redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
+    auth_uri = "https://accounts.google.com/o/oauth2/auth"
+    token_uri = "https://accounts.google.com/o/oauth2/token"
+
+    failed_num_photos = 0
+    skipped_num_photos = 0
+    downloaded_num_photos = 0
+    current_num_photo = 0
+    total_num_photos = 0
+
+    def __init__(self):
+        self.config_path = os.path.join(os.path.expanduser("~"), ".config/picasaexport.json")
+
+        if os.path.exists(self.config_path):
+            with open(self.config_path, "r") as config_file:
+                config = load(config_file)
+                self.export_path = config["export_path"]
+                self.token = config["token"]
+
+            self.session = self.create_session()
+            print(Fore.GREEN + "hello, %s" % self.get_user_info()["email"])
+        else:
+            self.token = None
+            self.session = self.create_session()
+            self.token = self.login()
+            print(Fore.GREEN + "you have authorized as %s" % self.get_user_info()["email"])
+
+            export_path = os.path.join(os.path.expanduser("~"), "Pictures/picasa-export")
+            chosen_path = input(Fore.BLUE + "please choose export path [%s]: " % export_path).strip()
+            export_path = os.path.abspath(chosen_path or export_path)
+
+            configs = {
+                "export_path": export_path,
+                "token": self.token,
+            }
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+            with open(self.config_path, "w") as config_file:
+                dump(configs, config_file)
+
+    def create_session(self):
+        return OAuth2Session(
+            client_id=self.client_id,
+            scope=self.scope,
+            redirect_uri=self.redirect_uri,
+            auto_refresh_url=self.token_uri,
+            auto_refresh_kwargs={
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+            },
+            token_updater=self.store_token,
+            token=self.token,
+        )
+
+    def login(self):
+        # authorization_url
+        url, state = self.session.authorization_url(
+            self.auth_uri,
+            access_type="offline",
+            approval_prompt="force",
+        )
+        print(Fore.GREEN + "opening your web browser, if it doesn't work please open this link manually and authorize")
+        print(Fore.WHITE + url)
+        open_new_tab(url)
+
+        code = input(Fore.BLUE + "Paste code here: ")
+        code = code.strip()
+        return self.session.fetch_token(
+            token_url=self.token_uri,
+            code=code,
+            client_secret=self.client_secret,
+        )
+
+    def store_token(self, token):
+        with open(self.config_path, "r") as config_file:
+            config = load(config_file)
+
+        config["token"] = token
+
+        with open(self.config_path, "w") as config_file:
+            dump(config, config_file)
+
+    def get_user_info(self):
+        return self.session.get('https://www.googleapis.com/oauth2/v1/userinfo').json()
+
+    def start_export(self):
+        self.failed_num_photos = 0
+        self.skipped_num_photos = 0
+        self.downloaded_num_photos = 0
+        self.current_num_photo = 0
+        self.total_num_photos = 0
+
+        albums = list(self.get_albums_list())
+
+        for album in albums:
+            self.total_num_photos += album["numphotos"]
+
+        print(Fore.GREEN + "you have %s albums and %d images" % (len(albums), self.total_num_photos))
+
+        try:
+            for album in albums:
+                self.export_album(album)
+        except KeyboardInterrupt:
+            print()
+            print(Fore.BLUE + "total images: ", self.total_num_photos)
+            print(Fore.BLUE + "scanned images: ", self.current_num_photo)
+            print(Fore.BLUE + "downloaded images: ", self.downloaded_num_photos)
+            print(Fore.BLUE + "skipped images: ", self.skipped_num_photos)
+            print(Fore.BLUE + "failed to download: ", self.failed_num_photos)
+
+    def get_albums_list(self):
+        print(Fore.CYAN + "fetching a list of your albums")
+
+        r = self.get_api("https://picasaweb.google.com/data/feed/api/user/default")
+        tree = ElementTree.fromstring(r)
+
+        for entry in tree.iter("{http://www.w3.org/2005/Atom}entry"):
+            yield {
+                "title": entry.find("{http://www.w3.org/2005/Atom}title").text,
+                "id": int(entry.find("{http://schemas.google.com/photos/2007}id").text),
+                "numphotos": int(entry.find("{http://schemas.google.com/photos/2007}numphotos").text),
+            }
+
+    def get_album_images_list(self, title, id, numphotos):
+        scanned = 0
+        while scanned < numphotos:
+            print(Fore.CYAN + "fetching a list images in '%s' from item #%d" % (title, scanned))
+            r = self.get_api("https://picasaweb.google.com/data/feed/api/user/default/albumid/%d?start-index=%d&max-results=100&imgmax=d" % (
+                id,
+                scanned + 1,
+            ))
+            tree = ElementTree.fromstring(r)
+
+            # total_result = int(tree.find("{http://a9.com/-/spec/opensearchrss/1.0/}totalResults").text)
+            # start_index = int(tree.find("{http://a9.com/-/spec/opensearchrss/1.0/}startIndex").text)
+            items_pre_page = int(tree.find("{http://a9.com/-/spec/opensearchrss/1.0/}itemsPerPage").text)
+            scanned += items_pre_page
+
+            for entry in tree.iter("{http://www.w3.org/2005/Atom}entry"):
+                for group in entry.iter("{http://search.yahoo.com/mrss/}group"):
+                    yield {
+                        "url": group.find("{http://search.yahoo.com/mrss/}content").attrib["url"],
+                        "file_name": group.find("{http://search.yahoo.com/mrss/}title").text,
+                    }
+
+    def export_album(self, album):
+        print(Fore.GREEN+ "exporting '%s' with %d photos" % (album["title"], album["numphotos"]))
+
+        export_path = os.path.join(self.export_path, album["title"])
+        os.makedirs(export_path, exist_ok=True)
+
+        for item in self.get_album_images_list(album["title"], album["id"], album["numphotos"]):
+            self.current_num_photo += 1
+
+            print(Fore.MAGENTA + "(%d/%d) %s/%s" %(
+                self.current_num_photo, self.total_num_photos,
+                album["title"], item["file_name"],
+            ))
+            self.get_image(
+                item["url"],
+                album["title"],
+                item["file_name"],
+            )
+
+    def get_api(self, url):
+        r = self.session.get(url, stream=True, timeout=100)
+
+        size = int(r.headers.get("Content-Length", 0))
+
+        if size:
+            bar = progressbar.ProgressBar(max_value=size)
+        else:
+            bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+        out = bytes()
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:
+                out += chunk
+
+            # bar.update(len(out))
+        return out
+
+    def get_image(self, url, album_title, file_name):
+        export_file = os.path.join(self.export_path, album_title, file_name)
+
+        if os.path.exists(export_file):
+            self.skipped_num_photos += 1
+            print(Fore.YELLOW + "%s already exists, skip" % file_name)
+            return
+
+        r = self.session.get(url, stream=True, timeout=100)
+
+        size = int(r.headers["Content-Length"])
+
+        bar = progressbar.ProgressBar(max_value=size)
+        out = bytes()
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:
+                out += chunk
+
+            bar.update(len(out))
+
+        if size != len(out):
+            self.failed_num_photos += 1
+            print(Fore.RED + "could not download %s" % file_name)
+
+        with open(export_file, "wb") as image:
+            self.downloaded_num_photos += 1
+            image.write(out)
+
+        print(Fore.GREEN + "saved as %s" % file_name)
+
+if __name__ == '__main__':
+    colorama.init(autoreset=True)
+    p = PicasaExport()
+    p.start_export()
