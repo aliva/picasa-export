@@ -13,3 +13,5 @@ pip3 install picasa-export
 ```
 picasa-export
 ```
+
+please report issues/ideas :)
