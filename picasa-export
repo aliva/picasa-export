@@ -68,12 +68,12 @@ class PicasaExport:
             self.token = self.login()
             print(Fore.GREEN + "you have authorized as %s" % self.get_user_info()["email"])
 
-            export_path = os.path.join(os.path.expanduser("~"), "Pictures/picasa-export")
-            chosen_path = input(Fore.BLUE + "please choose export path [%s]: " % export_path).strip()
-            export_path = os.path.abspath(chosen_path or export_path)
+            self.export_path = os.path.join(os.path.expanduser("~"), "Pictures/picasa-export")
+            chosen_path = input(Fore.BLUE + "please choose export path [%s]: " % self.export_path).strip()
+            self.export_path = os.path.abspath(chosen_path or self.export_path)
 
             configs = {
-                "export_path": export_path,
+                "export_path": self.export_path,
                 "token": self.token,
             }
             os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
