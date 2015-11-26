@@ -61,6 +61,7 @@ class PicasaExport:
                 self.token = config["token"]
 
             self.session = self.create_session()
+
             print(Fore.GREEN + "hello, %s" % self.get_user_info()["email"])
         else:
             self.token = None
@@ -105,6 +106,7 @@ class PicasaExport:
         print(Fore.WHITE + url)
         open_new_tab(url)
 
+        # fetch token
         code = input(Fore.BLUE + "Paste code here: ")
         code = code.strip()
         return self.session.fetch_token(
@@ -132,6 +134,7 @@ class PicasaExport:
         self.current_num_photo = 0
         self.total_num_photos = 0
 
+        # list of user albums
         albums = list(self.get_albums_list())
 
         for album in albums:
@@ -151,6 +154,9 @@ class PicasaExport:
             print(Fore.BLUE + "failed to download: ", self.failed_num_photos)
 
     def get_albums_list(self):
+        """
+        :return: a list of user albums
+        """
         print(Fore.CYAN + "fetching a list of your albums")
 
         r = self.get_api("https://picasaweb.google.com/data/feed/api/user/default")
@@ -164,6 +170,12 @@ class PicasaExport:
             }
 
     def get_album_images_list(self, title, id, numphotos):
+        """
+        :param title: title of album
+        :param id: id of alubm
+        :param numphotos: number of photos in album
+        :return: list of urls of images in album<id>
+        """
         scanned = 0
         while scanned < numphotos:
             print(Fore.CYAN + "fetching a list images in '%s' from item #%d" % (title, scanned))
@@ -173,8 +185,6 @@ class PicasaExport:
             ))
             tree = ElementTree.fromstring(r)
 
-            # total_result = int(tree.find("{http://a9.com/-/spec/opensearchrss/1.0/}totalResults").text)
-            # start_index = int(tree.find("{http://a9.com/-/spec/opensearchrss/1.0/}startIndex").text)
             items_pre_page = int(tree.find("{http://a9.com/-/spec/opensearchrss/1.0/}itemsPerPage").text)
             scanned += items_pre_page
 
@@ -186,6 +196,10 @@ class PicasaExport:
                     }
 
     def export_album(self, album):
+        """
+        export images of an album
+        :param album: dictionary containing album info
+        """
         print(Fore.GREEN+ "exporting '%s' with %d photos" % (album["title"], album["numphotos"]))
 
         export_path = os.path.join(self.export_path, album["title"])
@@ -198,13 +212,16 @@ class PicasaExport:
                 self.current_num_photo, self.total_num_photos,
                 album["title"], item["file_name"],
             ))
-            self.get_image(
+            self.get_media(
                 item["url"],
                 album["title"],
                 item["file_name"],
             )
 
     def get_api(self, url):
+        """
+        handles api requests
+        """
         r = self.session.get(url, stream=True, timeout=100)
 
         out = bytes()
@@ -213,7 +230,10 @@ class PicasaExport:
                 out += chunk
         return out
 
-    def get_image(self, url, album_title, file_name):
+    def get_media(self, url, album_title, file_name):
+        """
+        handles media downloads
+        """
         export_file = os.path.join(self.export_path, album_title, file_name)
 
         if os.path.exists(export_file):
@@ -242,6 +262,7 @@ class PicasaExport:
             image.write(out)
 
         print(Fore.GREEN + "saved as %s" % file_name)
+
 
 if __name__ == '__main__':
     colorama.init(autoreset=True)

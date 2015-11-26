@@ -28,7 +28,7 @@ from distutils.core import setup
 
 setup(
     name='picasa-export',
-    version='1.0',
+    version='0.1',
     description='exports your media from google-photos/picasa',
     author='Ali Vakilzade',
     author_email='ali@vakilzade.ir',
