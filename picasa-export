@@ -36,7 +36,7 @@ from xml.etree import ElementTree
 
 class PicasaExport:
     client_id = "944708730640-12sv3qrb240of2bpj2v20h4gobqmokgf.apps.googleusercontent.com"
-    client_secret = "xNyvKmmB4_qWCTg4dRxrR1xb "
+    client_secret = "xNyvKmmB4_qWCTg4dRxrR1xb"
     scope = [
         "https://www.googleapis.com/auth/userinfo.email",
         "https://picasaweb.google.com/data/",
