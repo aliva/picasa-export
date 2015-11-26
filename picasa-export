@@ -35,8 +35,8 @@ from xml.etree import ElementTree
 
 
 class PicasaExport:
-    client_id = "724353149631-gjh5pfmonqrajf6s69rj61i899t2dqde.apps.googleusercontent.com"
-    client_secret = "Wru1lU5ZAs8CHRajR6Gd1_DH"
+    client_id = "944708730640-12sv3qrb240of2bpj2v20h4gobqmokgf.apps.googleusercontent.com"
+    client_secret = "xNyvKmmB4_qWCTg4dRxrR1xb "
     scope = [
         "https://www.googleapis.com/auth/userinfo.email",
         "https://picasaweb.google.com/data/",
@@ -52,7 +52,7 @@ class PicasaExport:
     total_num_photos = 0
 
     def __init__(self):
-        self.config_path = os.path.join(os.path.expanduser("~"), ".config/picasaexport.json")
+        self.config_path = os.path.join(os.path.expanduser("~"), ".config/picasa-export.json")
 
         if os.path.exists(self.config_path):
             with open(self.config_path, "r") as config_file:
