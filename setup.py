@@ -40,7 +40,7 @@ setup(
         "colorama==0.3.3",
         "oauthlib==1.0.3",
         "progressbar2==3.5.0",
-        "requests==2.8.1",
+        "requests==2.20.0",
         "requests-oauthlib==0.5.0",
     ],
     license="BSD 3-Clause",
